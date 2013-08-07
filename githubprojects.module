@@ -1,0 +1,197 @@
+<?php 
+
+/**
+* @file
+* A block module that creates a list of Github projects for a user or organization.
+*/
+
+define("GITHUBPROJECTS_UPDATE_INTERVAL", 1 * 60 * 60); // In seconds
+define("GITHUBPROJECTS_ACTIVE_THRESHOLD", 60); // In days
+
+/**
+* Implements hook_help
+*
+* Displays help and module information.
+* 
+* @param path
+*   Which path of the site we are using to display help.
+* @param arg
+*   Array that holds the current path as returned from arg()
+*/
+
+function githubprojects_help($path, $arg){
+
+  switch ($path){
+
+    case "admin/help#githubprojects":
+      return '<p>' . t("Displays list of Github projects for a user or organization.") . '<p>';
+      break;
+
+  }
+
+}
+
+/**
+* Implements hook_menu
+* 
+* Allows the user to set the configuration variables.
+*/
+
+function githubprojects_menu(){
+
+  $items = array();
+
+  $items['admin/config/githubprojects'] = array(
+    'title' => 'Github Projects',
+    'description' => 'Configuration for the Github Projects Module',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('githubprojects_admin'),
+    'access arguments' => array('administer githubprojects settings'),
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  return $items;
+
+}
+
+/** 
+* Implements hook_form
+* 
+* Create the form that allows users to set the config vars.
+*/
+
+function githubprojects_admin(){
+
+  $form = array();
+
+  $form['githubprojects_apikey'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Github API Key'),
+    '#description' => t('Github API Key'),
+    '#required' => TRUE
+  );
+
+  return system_settings_form($form);
+
+}
+
+/** 
+* Updates the Github projects list.
+* 
+* Queries the Github API for projects to show.
+*/
+
+function githubprojects_update_projects ($key){
+
+  require_once("php-github-api/vendor/autoload.php");
+
+  $client = new Github\Client();
+
+  $client->authenticate($key, null, $client::AUTH_URL_TOKEN);
+
+  $result_pager = new Github\ResultPager($client);
+
+  $results = $result_pager->fetchAll(
+      $client->api("current_user"),
+      "repositories",
+      array()
+    );
+
+  foreach ($results as $result){
+
+    if (!$result['private']){
+
+      $id = $result['id'];
+      $name = $result['name'];
+      $description = $result['description'];
+      $html_url = $result['html_url'];
+
+      $timestamp = strtotime($result['pushed_at']);
+      $active = 0;
+      if ($timestamp > (time() - (GITHUBPROJECTS_ACTIVE_THRESHOLD * 24 * 60 * 60))){
+        $active = 1;
+      }
+
+      // check if already exists
+      $query = new EntityFieldQuery();
+      $entities = $query->entityCondition('entity_type', 'node')
+        ->propertyCondition('type', 'githubproject')
+        ->fieldCondition('githubprojects_id', NULL, $id, "=")
+        ->execute();
+
+      // Already exists
+      if (!empty($entities['node'])){
+        $node = node_load(current(array_keys($entities['node'])));
+      }
+      // Must render new 
+      else {
+        $node = new stdClass();
+        $node->type = 'githubproject';
+        $node->bundle = 'githubproject';
+        $node->revision = 0;
+        $node->language = 'en';
+        node_object_prepare($node);
+      }
+
+      // Add properties
+      $node->title = $name;
+
+      $node->githubprojects_active['und'][0]['value'] = $active;
+      $node->githubprojects_url['und'][0]['value'] = $html_url;
+      $node->githubprojects_id['und'][0]['value'] = $id;
+
+      // Save
+      $node = node_submit($node);
+      node_save($node);
+
+    }
+
+  }
+
+}
+
+/**
+* Implements hook_validate
+*
+* Validates input and invokes update
+*/
+
+function githubprojects_admin_validate($form, &$form_state) {
+
+  try {
+
+    $apikey = $form_state['values']['githubprojects_apikey'];
+
+    githubprojects_update_projects($apikey);
+
+  } catch (Exception $e){
+
+    form_set_error('githubprojects_apikey', t($e->getMessage()));
+
+  }
+
+}
+
+/**
+* Implements hook_cron
+*
+* Calls the update project function every interval
+*/
+
+function githubprojects_cron (){
+
+  if (time() >= (variable_get('githubprojects_last_execution', 0) + GITHUBPROJECTS_UPDATE_INTERVAL)) {
+
+    $apikey = variable_get('githubprojects_apikey', NULL);
+
+    if (!is_null($apikey)){
+
+      githubprojects_update_projects($apikey);
+
+    }
+  
+    variable_set('githubprojects_last_execution', time());
+
+  }
+
+}

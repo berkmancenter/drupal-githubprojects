@@ -1,0 +1,90 @@
+<?php 
+
+/**
+* Implements hook_install
+*
+* Adds the custom githubproject content type
+*/
+
+function githubprojects_enable() {
+
+  // Add the content type
+
+  if (!in_array('githubproject', node_type_get_names())) {
+
+    $type = array(
+      'type' => 'githubproject',
+      'name' => t('Github Project'),
+      'base' => 'node_content',
+      'custom' => 1,
+      'modified' => 1,
+      'locked' => 1,
+      'has_title' => TRUE,
+      'title_label' => 'Title'
+    );
+
+    $type = node_type_set_defaults($type);
+    node_type_save($type);
+    node_add_body_field($type);
+
+  }
+
+  // Add fields to the content type
+
+  if (!field_info_field('githubprojects_url')) {
+
+    $field = array(
+        'field_name' => 'githubprojects_url',
+        'type' => 'text',
+    );
+    field_create_field($field);
+
+    $instance = array(
+        'field_name' => 'githubprojects_url',
+        'entity_type' => 'node',
+        'label' => 'URL',
+        'bundle' => 'githubproject'
+    );
+    field_create_instance($instance);
+
+  }
+
+  if (!field_info_field('githubprojects_active')) {
+
+    $field = array(
+        'field_name' => 'githubprojects_active',
+        'type' => 'list_boolean',
+        'settings' => array(
+          'allowed_values' => array(0 => 'Not Active', 1 => 'Active'),
+          'allowed_values_function' => ''
+        )
+    );
+    field_create_field($field);
+
+    $instance = array(
+        'field_name' => 'githubprojects_active',
+        'entity_type' => 'node',
+        'label' => 'Active',
+        'bundle' => 'githubproject'
+    );
+    field_create_instance($instance);
+  }
+
+  if (!field_info_field('githubprojects_id')) {
+
+    $field = array(
+        'field_name' => 'githubprojects_id',
+        'type' => 'number_integer',
+    );
+    field_create_field($field);
+
+    $instance = array(
+        'field_name' => 'githubprojects_id',
+        'entity_type' => 'node',
+        'label' => 'Github ID',
+        'bundle' => 'githubproject'
+    );
+    field_create_instance($instance);
+  }
+
+}

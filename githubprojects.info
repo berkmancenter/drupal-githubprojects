@@ -1,0 +1,5 @@
+name = Github Projects
+description = Adds a list of all the projects for a specified github user to showcase on the site. 
+core = 7.x
+
+configure = admin/config/githubprojects
