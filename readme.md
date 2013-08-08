@@ -7,6 +7,10 @@
 3. Click configure and paste a Github access token (from https://github.com/settings/applications).
 4. Your nodes should now be populated.
 
+## Uninstall
+
+Delete the content type `githubproject`.
+
 ## Usage
 
 Every hour the plugin will import all your github projects as nodes. This allows you to list and link to their pages locally.
